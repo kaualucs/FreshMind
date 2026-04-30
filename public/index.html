@@ -540,6 +540,11 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           Copiar transcrição
         </button>
+        <a href="/dashboard.html" style="text-decoration:none;">
+          <button class="btn-icon" style="background:#ede9fe; color:#5b21b6; border-color:#7c3aed;" type="button">
+            📊 Dashboard NotebookLM
+          </button>
+        </a>
         <button class="btn-claude" id="analyzeBtn" onclick="analyzeWithClaude()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><circle cx="19" cy="5" r="3" fill="currentColor" stroke="none"/></svg>
           <div class="analysis-spinner" id="analyzeSpinner"></div>
@@ -584,6 +589,9 @@
 let transcriptText = '';
 let convMetaText = '';
 let analysisText = '';
+let conversationData = null;
+let contactData = null;
+let allMessages = [];
 
 // ── Helpers ──────────────────────────────────────────────────────
 function setStatus(type, msg, spin = false) {
@@ -682,6 +690,11 @@ async function fetchConversation(convId) {
 
 // ── Render ────────────────────────────────────────────────────────
 function render({ conv, contact, msgs }) {
+  // Salva os dados globalmente para uso no salvamento
+  conversationData = conv;
+  contactData = contact;
+  allMessages = msgs;
+
   const statusColor = {
     'assigned': 'badge-blue',
     'resolved': 'badge-green',
@@ -906,6 +919,21 @@ async function importToNotebookLM() {
       });
       const check = setInterval(() => { if (popup.closed) { clearInterval(check); reject(new Error('Autenticação cancelada')); } }, 500);
     }).catch(e => { showToast('error', `❌ ${e.message}`); btn.disabled = false; btn.innerHTML = notebookBtnHTML(); throw e; });
+  }
+
+  // Salva a conversa no banco antes de enviar ao Docs
+  try {
+    await fetch('/api/chats/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conv: conversationData,
+        contact: contactData,
+        msgs: allMessages
+      })
+    });
+  } catch (e) {
+    console.warn('Não foi possível salvar no banco:', e.message);
   }
 
   try {

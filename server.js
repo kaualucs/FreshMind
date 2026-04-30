@@ -148,7 +148,16 @@ Diretrizes de Classificação:
 Ao identificar o TEMA, utilize estritamente uma das opções abaixo:
 NFP, Agenda/Grades, Cadastros/Contratos, Wellhub/TotalPass, Treinos/Financeiro, CRM, Relatórios, Loja, Loja - Wellhub, Loja - TotalPass, Loja - GoNutri, Loja - App do Aluno, Loja - Notas fiscais, Loja - Pingo | Plug, Outros, Administrativo, Multiunidade, Migração, desktop e Web, Importação de planilha, Alteração cadastral, Reembolso Next Fit, CSM - Engajamento, CSM - Retenção, Equipamentos - Catracas ou Backup de dados.
 Identificação de Ticket:
-Responda "Sim" para Ticket Aberto se encontrar padrões como: links do Freshdesk, menções a @APOIO VALIDAR TICKET, números de protocolo precedidos por # ou status de engenharia/sustentação. Caso contrário, responda "Não".
+Sua tarefa é identificar se um ticket de atendimento foi ABERTO durante a conversa. Seja extremamente rigoroso.
+Responda "Sim" APENAS se encontrar evidência explícita de que um ticket foi gerado, como:
+- Uma mensagem do sistema ou agente contendo um link do Freshdesk (ex: "https://...freshdesk.com/...").
+- Uma menção direta a um número de ticket ou protocolo (ex: "Ticket #12345").
+- O uso de comandos como @APOIO VALIDAR TICKET.
+Responda "Não" em todos os outros casos, incluindo:
+- Se o agente apenas mencionou que "vai verificar" ou "vai reportar".
+- Se houve apenas um encaminhamento interno não documentado.
+- Se não houver uma evidência clara e textual da abertura do ticket na transcrição fornecida.
+Sua resposta final nesse campo deve ser apenas "Sim" ou "Não".
 Estrutura do Relatório (Markdown):
 0. METADADOS DO ATENDIMENTO
 Cliente: [Nome]
@@ -292,6 +301,15 @@ function extractDor(analysis) {
 function extractResolucao(analysis) {
   const match = analysis.match(/2\.\s*RESOLUÇÃO DO AGENTE[^\n]*\n([\s\S]*)/i);
   return match ? match[1].trim() : '';
+}
+function extractTema(analysis) {
+  const match = analysis.match(/Tema:\s*(.+)/i);
+  return match ? match[1].trim() : 'Não identificado';
+}
+
+function extractTicket(analysis) {
+  const match = analysis.match(/Ticket Aberto\?\s*(Sim|Não)/i);
+  return match ? match[1].trim() : 'Não identificado';
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────

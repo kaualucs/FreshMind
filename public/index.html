@@ -614,6 +614,41 @@ function fmtDate(str) {
   return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
 }
 
+function extractTema(analysis) {
+  const match = analysis.match(/Tema:\s*(.+)/i);
+  return match ? match[1].trim() : 'Não identificado';
+}
+
+function extractTicket(analysis) {
+  const match = analysis.match(/Ticket Aberto\?\s*(Sim|Não)/i);
+  const iaResult = match ? match[1].trim() : null;
+  
+  // Fallback por regra de força bruta
+  const ruleResult = detectTicketByRule(transcriptText);
+  
+  // Se a IA disse "Sim", mas não há evidência no texto, corrija para "Não"
+  if (iaResult === 'Sim' && ruleResult === 'Não') {
+    console.log('⚠️ IA detectou Ticket Aberto, mas regra manual não encontrou evidências. Corrigindo para "Não".');
+    return 'Não (corrigido)';
+  }
+  
+  // Se a IA não conseguiu identificar, usa o resultado da regra
+  if (!iaResult) {
+    return ruleResult;
+  }
+  
+  return iaResult;
+}
+
+function detectTicketByRule(transcript) {
+  const lowerText = transcript.toLowerCase();
+  // Procura por evidências textuais claras
+  if (lowerText.includes('freshdesk.com') || lowerText.includes('ticket #') || lowerText.includes('@apoio validar ticket')) {
+    return 'Sim';
+  }
+  return 'Não';
+}
+
 // ── Fetch (via servidor local) ────────────────────────────────────
 async function fetchConversation(convId) {
   const convRes = await fetch(`/api/conversations/${convId}`);
@@ -874,10 +909,15 @@ async function importToNotebookLM() {
   }
 
   try {
+    // Extrai tema e ticket da análise gerada
+    const tema = extractTema(analysisText);
+    const ticket = extractTicket(analysisText);
+    const metaCompleto = `${convMetaText}\nTema: ${tema}\nTicket Aberto? ${ticket}`;
+
     const res = await fetch('/api/google/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ meta: convMetaText, analysis: analysisText, transcript: transcriptText }),
+      body: JSON.stringify({ meta: metaCompleto, analysis: analysisText, transcript: transcriptText }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);

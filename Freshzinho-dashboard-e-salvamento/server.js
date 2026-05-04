@@ -177,7 +177,7 @@ TRANSCRIÇÃO:
 ${transcript}`;
 
     const result = await genAI.models.generateContentStream({
-      model: "gemini-2.5-flash",
+    model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
 
@@ -225,9 +225,36 @@ app.post('/api/batch-process', async (req, res) => {
       return `${label} – ${time}: ${content}`;
     }).join('\n');
 
-    // 3. Meta
-    const meta = `ID: ${conv.id || conv.conversation_id}\nContato: ${conv.user_name || conv.user_id}\nAgente: ${conv.assigned_agent_id}\nInício: ${new Date(conv.created_time).toLocaleString('pt-BR')}\nCanal: ${conv.channel_id}`;
+    // 3. Meta (cabeçalho para o Google Docs)
+    // Busca o nome do contato (usuário)
+    let contactName = conv.user_name || null;
+    if (!contactName && conv.user_id) {
+      try {
+        const userRes = await fcFetch(`${FC_BASE}/users/${conv.user_id}`);
+        contactName = [userRes.first_name, userRes.last_name].filter(Boolean).join(' ') || userRes.email || conv.user_id;
+      } catch (_) {
+        contactName = conv.user_id;
+      }
+    }
+    contactName = contactName || '—';
 
+    // Busca o nome do agente
+    let agentName = conv.assigned_agent_name || null;
+    if (!agentName && conv.assigned_agent_id) {
+      try {
+        const agentRes = await fcFetch(`${FC_BASE}/agents/${conv.assigned_agent_id}`);
+        agentName = [agentRes.first_name, agentRes.last_name].filter(Boolean).join(' ') || agentRes.email || conv.assigned_agent_id;
+      } catch (_) {
+        agentName = conv.assigned_agent_id;
+      }
+    }
+    agentName = agentName || '—';
+
+    // Link do atendimento
+    const convLink = `https://sistemanextfit.freshchat.com/a/${FC_APP_ID}/inbox/0/conversation/${conv.id || conv.conversation_id}`;
+
+    const meta = `Contato: ${contactName}\nAgente: ${agentName}\nInício: ${new Date(conv.created_time).toLocaleString('pt-BR')}\nAtendimento: ${convLink}`;
+    
     // 4. Análise com Gemini (não-streaming) – CORRIGIDO
     const prompt = `Contexto e Persona:
 Você é um Analista Sênior de QA de Atendimento. Sua função é processar transcrições de suporte para extrair dados estruturados e operacionais, focando na resolução técnica e eliminando ruídos (cumprimentos e conversas irrelevantes).
@@ -264,7 +291,7 @@ TRANSCRIÇÃO:
 ${transcript}`;
 
     const result = await genAI.models.generateContent({
-      model: "gemini-2.5-flash",
+    model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
     const analysis = result.text;

@@ -761,13 +761,16 @@ function render({ conv, contact, msgs }) {
     return agentMsg?.actor_name || conv.assigned_agent_id || '—';
   })();
 
+  // Monta o link do atendimento
+  const convLink = `https://sistemanextfit.freshchat.com/a/507855495287111/inbox/0/conversation/${conv.id || conv.conversation_id}`;
+  // (substitua o número pelo seu FC_APP_ID, se necessário)
+
   const infoItems = [
-    { k: 'ID',         v: conv.id || conv.conversation_id || '—' },
-    { k: 'Contato',    v: contactName },
-    { k: 'Agente',     v: agentName },
+    { k: 'Contato',    v: conv.user_name || contactName },
+    { k: 'Agente',     v: conv.assigned_agent_name || agentName },
     { k: 'Início',     v: fmtDate(conv.created_time) },
     { k: 'Atualizado', v: fmtDate(conv.updated_time) },
-    { k: 'Canal',      v: conv.channel_id || '—' },
+    { k: 'Atendimento',v: convLink },
   ];
 
   document.getElementById('infoGrid').innerHTML = infoItems.map(i =>

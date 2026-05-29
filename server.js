@@ -19,6 +19,11 @@ if (!FC_TOKEN) console.warn('⚠️  Configure FRESHCHAT_API_KEY no .env');
 console.log(`→ API base: ${FC_BASE}`);
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  function getGenAI(apiKeyIndex) {
+    const keyNumber = apiKeyIndex || '1';
+    const apiKey = process.env[`GEMINI_API_KEY_${keyNumber}`] || process.env.GEMINI_API_KEY;
+    return new GoogleGenAI({ apiKey });
+  }
 
 // ── Google OAuth ──────────────────────────────────────────────────────────────
 
@@ -176,7 +181,9 @@ Resultado Final: Como o atendimento foi encerrado.
 TRANSCRIÇÃO:
 ${transcript}`;
 
-    const result = await genAI.models.generateContentStream({
+    const { apiKeyIndex } = req.body;
+    const dynamicGenAI = getGenAI(apiKeyIndex);
+    const result = await dynamicGenAI.models.generateContentStream({
     model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });

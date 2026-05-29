@@ -586,6 +586,16 @@
         <button class="btn-icon" onclick="copyTranscript()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           Copiar transcrição
+        
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+      <label for="apiKeySelect" style="color: var(--text-mid); font-size: 13px; font-weight: 600;">API Gemini:</label>
+      <select id="apiKeySelect" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.25); color: #fff; font-family: 'Inter', sans-serif; font-size: 13px;">
+        <option value="1">Conta 1 (Principal)</option>
+        <option value="2">Conta 2</option>
+        <option value="3">Conta 3</option>
+      </select>
+    </div>
+
         </button>
         <button class="btn-claude" id="analyzeBtn" onclick="analyzeWithClaude()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><circle cx="19" cy="5" r="3" fill="currentColor" stroke="none"/></svg>
@@ -894,7 +904,8 @@ async function analyzeWithClaude() {
     const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript: transcriptText }),
+      const selectedKey = document.getElementById('apiKeySelect').value;
+      body: JSON.stringify({ transcript: transcriptText, apiKeyIndex: selectedKey }),
     });
 
     const reader = res.body.getReader();

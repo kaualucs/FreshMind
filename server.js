@@ -18,21 +18,33 @@ const FC_APP_ID = (process.env.FRESHCHAT_APP_ID || '').trim();
 if (!FC_TOKEN) console.warn('⚠️  Configure FRESHCHAT_API_KEY no .env');
 console.log(`→ API base: ${FC_BASE}`);
 
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  function getGenAI(apiKeyIndex) {
-    const keyNumber = apiKeyIndex || '1';
-    const apiKey = process.env[`GEMINI_API_KEY_${keyNumber}`] || process.env.GEMINI_API_KEY;
-    return new GoogleGenAI({ apiKey });
-  }
+// Função para obter a chave Gemini correta
+function getGenAI(apiKeyIndex) {
+  const keyNumber = apiKeyIndex || '1';
+  const apiKey = process.env[`GEMINI_API_KEY_${keyNumber}`] || process.env.GEMINI_API_KEY;
+  return new GoogleGenAI({ apiKey });
+}
+
+// Função para obter o ID do documento Google com base no tema
+function getDocId(tema) {
+  const keyMap = {
+    'NFP': 'GOOGLE_DOC_ID_NFP',
+    'NF': 'GOOGLE_DOC_ID_NF',
+    'GONUTRI': 'GOOGLE_DOC_ID_GONUTRI',
+    'IA': 'GOOGLE_DOC_ID_IA',
+    'RELATORIOS': 'GOOGLE_DOC_ID_RELATORIOS',
+    'CRM': 'GOOGLE_DOC_ID_CRM',
+    'PASS': 'GOOGLE_DOC_ID_PASS',
+    'WOD': 'GOOGLE_DOC_ID_WOD'
+  };
+  const envKey = keyMap[tema];
+  return process.env[envKey] || process.env.GOOGLE_DOC_ID; // fallback para o padrão
+}
 
 // ── Google OAuth ──────────────────────────────────────────────────────────────
 
 const TOKENS_FILE = path.join(__dirname, '.google-tokens.json');
 const REDIRECT_URI = `http://localhost:${PORT}/auth/google/callback`;
-
-// Aceita tanto o ID puro quanto a URL completa do Google Docs
-const _rawDocId = (process.env.GOOGLE_DOC_ID || '').trim();
-const GOOGLE_DOC_ID = _rawDocId.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1] ?? _rawDocId.split('/')[0];
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -145,7 +157,6 @@ app.post('/api/analyze', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   try {
-
     const prompt = `
 Contexto e Persona:
 Você é um Analista Sênior de QA de Atendimento. Sua função é processar transcrições de suporte para extrair dados estruturados e operacionais, focando na resolução técnica e eliminando ruídos (cumprimentos e conversas irrelevantes).
@@ -184,7 +195,7 @@ ${transcript}`;
     const { apiKeyIndex } = req.body;
     const dynamicGenAI = getGenAI(apiKeyIndex);
     const result = await dynamicGenAI.models.generateContentStream({
-    model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
 
@@ -206,11 +217,11 @@ ${transcript}`;
 
 // ── Batch Process ──────────────────────────────────────────────────────────────
 app.post('/api/batch-process', async (req, res) => {
-  const { convId } = req.body;
+  const { convId, docTheme } = req.body;
   if (!convId) return res.status(400).json({ error: 'ID da conversa ausente' });
 
   try {
-       // 1. Busca a conversa (converte ID numérico se necessário)
+    // 1. Busca a conversa (converte ID numérico se necessário)
     let convIdOriginal = convId;
     if (/^\d+$/.test(convIdOriginal)) {
       const convTemp = await fcFetch(`${FC_BASE}/conversations/${convIdOriginal}`);
@@ -233,7 +244,6 @@ app.post('/api/batch-process', async (req, res) => {
     }).join('\n');
 
     // 3. Meta (cabeçalho para o Google Docs)
-    // Busca o nome do contato (usuário)
     let contactName = conv.user_name || null;
     if (!contactName && conv.user_id) {
       try {
@@ -245,7 +255,6 @@ app.post('/api/batch-process', async (req, res) => {
     }
     contactName = contactName || '—';
 
-    // Busca o nome do agente
     let agentName = conv.assigned_agent_name || null;
     if (!agentName && conv.assigned_agent_id) {
       try {
@@ -257,12 +266,10 @@ app.post('/api/batch-process', async (req, res) => {
     }
     agentName = agentName || '—';
 
-    // Link do atendimento
     const convLink = `https://sistemanextfit.freshchat.com/a/${FC_APP_ID}/inbox/0/conversation/${conv.id || conv.conversation_id}`;
-
     const meta = `Contato: ${contactName}\nAgente: ${agentName}\nInício: ${new Date(conv.created_time).toLocaleString('pt-BR')}\nAtendimento: ${convLink}`;
     
-    // 4. Análise com Gemini (não-streaming) – CORRIGIDO
+    // 4. Análise com Gemini (não-streaming)
     const prompt = `Contexto e Persona:
 Você é um Analista Sênior de QA de Atendimento. Sua função é processar transcrições de suporte para extrair dados estruturados e operacionais, focando na resolução técnica e eliminando ruídos (cumprimentos e conversas irrelevantes).
 Diretrizes de Classificação:
@@ -297,16 +304,20 @@ Resultado Final: Como o atendimento foi encerrado.
 TRANSCRIÇÃO:
 ${transcript}`;
 
-    const result = await genAI.models.generateContent({
-    model: "gemini-2.5-flash",
+    const { apiKeyIndex } = req.body;
+    const dynamicGenAI = getGenAI(apiKeyIndex);
+    const result = await dynamicGenAI.models.generateContent({
+      model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
     const analysis = result.text;
 
     // 5. Salva no Google Docs
-    if (!GOOGLE_DOC_ID) return res.status(500).json({ error: 'GOOGLE_DOC_ID não configurado' });
+    const docId = getDocId(docTheme || 'DEFAULT');
+    if (!docId) return res.status(500).json({ error: 'ID do documento não configurado para este tema' });
+
     const docs = google.docs({ version: 'v1', auth: oauth2Client });
-    const doc = await docs.documents.get({ documentId: GOOGLE_DOC_ID });
+    const doc = await docs.documents.get({ documentId: docId });
     const bodyContent = doc.data.body.content;
     const endIndex = bodyContent[bodyContent.length - 1].endIndex - 1;
 
@@ -343,13 +354,13 @@ ${transcript}`;
     ].join('\n');
 
     await docs.documents.batchUpdate({
-      documentId: GOOGLE_DOC_ID,
+      documentId: docId,
       requestBody: {
         requests: [{ insertText: { location: { index: endIndex }, text: block } }],
       },
     });
 
-    console.log(`✓ Atendimento ${convId} processado e adicionado ao Google Doc (${GOOGLE_DOC_ID})`);
+    console.log(`✓ Atendimento ${convId} processado e adicionado ao Google Doc (${docId})`);
     res.json({ ok: true });
 
   } catch (e) {
@@ -396,16 +407,17 @@ app.get('/auth/google/callback', async (req, res) => {
 app.post('/api/google/upload', async (req, res) => {
   if (!isGoogleAuthed()) return res.status(401).json({ error: 'Não autenticado no Google' });
 
-  const { meta, analysis, transcript } = req.body;
+  const { meta, analysis, transcript, docTheme } = req.body;
   if (!analysis) return res.status(400).json({ error: 'analysis obrigatório' });
 
-  if (!GOOGLE_DOC_ID) return res.status(500).json({ error: 'GOOGLE_DOC_ID não configurado no .env' });
+  const docId = getDocId(docTheme || 'DEFAULT');
+  if (!docId) return res.status(500).json({ error: 'ID do documento não configurado para este tema' });
 
   try {
     const docs = google.docs({ version: 'v1', auth: oauth2Client });
 
     // Busca o doc para saber o índice final
-    const doc = await docs.documents.get({ documentId: GOOGLE_DOC_ID });
+    const doc = await docs.documents.get({ documentId: docId });
     const bodyContent = doc.data.body.content;
     const endIndex = bodyContent[bodyContent.length - 1].endIndex - 1;
 
@@ -439,14 +451,14 @@ app.post('/api/google/upload', async (req, res) => {
     ].join('\n');
 
     await docs.documents.batchUpdate({
-      documentId: GOOGLE_DOC_ID,
+      documentId: docId,
       requestBody: {
         requests: [{ insertText: { location: { index: endIndex }, text: block } }],
       },
     });
 
-    console.log(`✓ Atendimento appendado no Google Doc (${GOOGLE_DOC_ID})`);
-    res.json({ ok: true, docId: GOOGLE_DOC_ID });
+    console.log(`✓ Atendimento appendado no Google Doc (${docId})`);
+    res.json({ ok: true, docId: docId });
   } catch (e) {
     console.error('Docs append error:', e.message);
     res.status(500).json({ error: e.message });
@@ -463,6 +475,7 @@ function extractResolucao(analysis) {
   const match = analysis.match(/2\.\s*RESOLUÇÃO DO AGENTE[^\n]*\n([\s\S]*)/i);
   return match ? match[1].trim() : '';
 }
+
 function extractTema(analysis) {
   const match = analysis.match(/Tema:\s*(.+)/i);
   return match ? match[1].trim() : 'Não identificado';

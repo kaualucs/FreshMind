@@ -215,6 +215,74 @@ ${transcript}`;
   }
 });
 
+// ── Preview (resumo curto antes de processar) ────────────────────────────────
+app.post('/api/preview', async (req, res) => {
+  const { convId, apiKeyIndex } = req.body;
+  if (!convId) return res.status(400).json({ error: 'ID da conversa ausente' });
+
+  try {
+    let convIdOriginal = convId;
+    if (/^\d+$/.test(convIdOriginal)) {
+      const convTemp = await fcFetch(`${FC_BASE}/conversations/${convIdOriginal}`);
+      convIdOriginal = convTemp.id || convTemp.conversation_id || convIdOriginal;
+    }
+
+    const conv = await fcFetch(`${FC_BASE}/conversations/${convIdOriginal}`);
+    const msgsRes = await fcFetch(`${FC_BASE}/conversations/${convIdOriginal}/messages?page=1&items_per_page=50&app_id=${FC_APP_ID}`);
+    const msgs = msgsRes.messages || [];
+    msgs.sort((a, b) => new Date(a.created_time || 0) - new Date(b.created_time || 0));
+
+    const transcript = msgs.map(m => {
+      const type = (m.actor_type || '');
+      const label = type === 'agent' ? '[Agente]' : (type === 'system' || type === 'bot' ? '[Sistema]' : '[Cliente]');
+      const time = m.created_time ? new Date(m.created_time).toLocaleString('pt-BR') : '';
+      const content = (m.message_parts || []).map(p => p?.text?.content).filter(Boolean).join(' ');
+      return `${label} – ${time}: ${content}`;
+    }).join('\n');
+
+    let contactName = conv.user_name || null;
+    if (!contactName && conv.user_id) {
+      try {
+        const userRes = await fcFetch(`${FC_BASE}/users/${conv.user_id}`);
+        contactName = [userRes.first_name, userRes.last_name].filter(Boolean).join(' ') || userRes.email || conv.user_id;
+      } catch (_) {
+        contactName = conv.user_id;
+      }
+    }
+    contactName = contactName || '—';
+
+    const prompt = `Você é um assistente que cria resumos curtos de atendimentos de suporte ao cliente.
+Leia a transcrição abaixo e escreva um resumo BEM CURTO (no máximo 3 frases), em português, explicando:
+- O que o cliente queria/precisava
+- Sobre o que, em geral, a conversa tratou
+- Qual foi a resolução, se houve
+
+Responda apenas com o resumo em texto corrido, sem markdown, sem títulos e sem listas.
+
+TRANSCRIÇÃO:
+${transcript}`;
+
+    const dynamicGenAI = getGenAI(apiKeyIndex);
+    const result = await dynamicGenAI.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+
+    const convLink = `https://sistemanextfit.freshchat.com/a/${FC_APP_ID}/inbox/0/conversation/${conv.id || conv.conversation_id}`;
+
+    res.json({
+      convId,
+      contactName,
+      convLink,
+      msgCount: msgs.length,
+      resumo: (result.text || '').trim(),
+    });
+  } catch (e) {
+    console.error('Erro no preview:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Batch Process ──────────────────────────────────────────────────────────────
 app.post('/api/batch-process', async (req, res) => {
   const { convId, docTheme } = req.body;

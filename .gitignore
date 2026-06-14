@@ -1,7 +1,3 @@
-<<<<<<< HEAD
 .env
 .google-tokens.json
 node_modules/
-=======
-/package-lock.json
->>>>>>> origin/modelo-2.5-flash

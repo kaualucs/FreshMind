@@ -3,37 +3,37 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Freshchat · Visualizador de Conversa</title>
+  <title>Freshchat · Processador de Atendimentos 👻</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='34' r='28' fill='%238b5cf6'/%3E%3Cellipse cx='23' cy='30' rx='5.5' ry='7.5' fill='%23ff5a6a'/%3E%3Cellipse cx='41' cy='30' rx='5.5' ry='7.5' fill='%23ff5a6a'/%3E%3Cpath d='M16 44 C22 54 42 54 48 44 L44 50 L38 45 L32 50 L26 45 L20 50 Z' fill='%231a0a2e'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg:       #f4f6f9;
+      --bg:       #2e0a4e;
       --white:    #ffffff;
-      --border:   #dde1ea;
-      --primary:  #7c3aed;
-      --primary-dark: #6d28d9;
+      --border:   #4e2a6e;
+      --primary:  #c78dc7;
+      --primary-dark: #a56ba5;
       --success:  #1a8a4a;
-      --warn:     #c0392b;
-      --info:     #6d28d9;
-      --text:     #1c2340;
-      --text-mid: #4b5475;
-      --muted:    #8a92a8;
-      --shadow:   0 2px 8px rgba(0,0,0,.08);
-      --shadow-lg: 0 4px 20px rgba(0,0,0,.1);
-
-      /* Chat bubble colors */
-      --bubble-client-bg:  #f0f2f5;
-      --bubble-client-txt: #1c2340;
-      --bubble-agent-bg:   #7c3aed;
-      --bubble-agent-txt:  #ffffff;
-      --bubble-bot-bg:     #fff8e7;
-      --bubble-bot-txt:    #7a5800;
+      --warn:     #ff6b6b;
+      --info:     #c78dc7;
+      --text:     #f5e6f7;
+      --text-mid: #d4b8dc;
+      --muted:    #b89ac2;
+      --shadow:   0 2px 8px rgba(0,0,0,.3);
+      --shadow-lg: 0 4px 20px rgba(0,0,0,.4);
+      --bubble-client-bg:  #3b1f5e;
+      --bubble-client-txt: #f5e6f7;
+      --bubble-agent-bg:   #c78dc7;
+      --bubble-agent-txt:  #1a0a2e;
+      --bubble-bot-bg:     #4e2a6e;
+      --bubble-bot-txt:    #f5e6f7;
     }
-
     body {
-      background: var(--bg);
+      position: relative;
+      background: linear-gradient(135deg, #560ea2 0%, #c78dc7 50%, #f496a6 100%);
+      background-size: cover;
+      background-attachment: fixed;
       color: var(--text);
       font-family: 'Inter', 'Nunito', sans-serif;
       min-height: 100vh;
@@ -41,488 +41,147 @@
       flex-direction: column;
       align-items: center;
       padding: 40px 16px 80px;
+      overflow-x: hidden;
     }
-
-    .wrap {
-      width: 100%;
-      max-width: 840px;
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(90px);
+      pointer-events: none;
+      z-index: 0;
     }
-
-    /* ── Header ── */
-    header {
-      margin-bottom: 32px;
-    }
-
-    .logo-row {
-      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
-    }
-
-    .logo-icon {
-      width: 36px; height: 36px;
-      background: var(--primary); border-radius: 8px;
-      display: grid; place-items: center;
-      flex-shrink: 0;
-    }
-
-    .logo-icon svg { width: 18px; height: 18px; }
-
-    .logo-text {
-      font-family: 'Nunito', sans-serif;
-      font-size: 15px; font-weight: 700;
-      color: var(--text); letter-spacing: -.01em;
-    }
-
-    h1 {
-      font-family: 'Nunito', sans-serif;
-      font-size: clamp(22px, 4vw, 30px);
-      font-weight: 800; line-height: 1.2;
-      color: var(--text);
-    }
-
+    body::before { width: 380px; height: 380px; background: rgba(255,107,107,.28); top: -140px; left: -120px; }
+    body::after { width: 440px; height: 440px; background: rgba(86,14,162,.4); bottom: -180px; right: -160px; }
+    .wrap { position: relative; z-index: 1; width: 100%; max-width: 840px; }
+    header { margin-bottom: 32px; }
+    h1 { font-family: 'Nunito', sans-serif; font-size: clamp(22px, 4vw, 30px); font-weight: 800; line-height: 1.2; color: var(--text); }
     h1 span { color: var(--primary); }
-
-    .subtitle {
-      margin-top: 6px;
-      font-size: 14px;
-      color: var(--text-mid);
-      line-height: 1.6;
-    }
-
-    /* ── Card ── */
-    .card {
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px 28px;
-      margin-bottom: 20px;
-      box-shadow: var(--shadow);
-    }
-
-    .card-title {
-      font-family: 'Nunito', sans-serif;
-      font-size: 13px; font-weight: 700;
-      color: var(--text-mid);
-      margin-bottom: 16px;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      display: flex; align-items: center; gap: 8px;
-    }
-
-    .card-title::after {
-      content: ''; flex: 1; height: 1px; background: var(--border);
-    }
-
-    /* ── Form ── */
+    .subtitle { margin-top: 6px; font-size: 14px; color: var(--text-mid); line-height: 1.6; }
+    .card { background: rgba(46, 10, 78, 0.75); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 24px 28px; margin-bottom: 20px; box-shadow: var(--shadow); }
+    .card-title { font-family: 'Nunito', sans-serif; font-size: 13px; font-weight: 700; color: var(--text-mid); margin-bottom: 16px; text-transform: uppercase; letter-spacing: .06em; display: flex; align-items: center; gap: 8px; }
+    .card-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
     .field { margin-bottom: 14px; }
     .field:last-child { margin-bottom: 0; }
-
-    label {
-      display: block;
-      font-size: 13px; font-weight: 600;
-      color: var(--text-mid);
-      margin-bottom: 6px;
-    }
-
-    input[type="text"] {
-      width: 100%;
-      background: var(--white);
-      border: 1.5px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      padding: 10px 14px;
-      outline: none;
-      transition: border-color .2s, box-shadow .2s;
-    }
-
-    input:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(124,58,237,.1);
-    }
-
-    input::placeholder { color: var(--muted); }
-
-    .input-row {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 10px;
-      align-items: end;
-    }
-
-    /* ── Buttons ── */
-    button {
-      cursor: pointer; border: none;
-      font-family: 'Nunito', sans-serif;
-      font-weight: 700; border-radius: 8px;
-      transition: all .15s;
-    }
-
+    label { display: block; font-size: 13px; font-weight: 600; color: var(--text-mid); margin-bottom: 6px; }
+    input[type="text"] { width: 100%; background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.25); border-radius: 8px; color: #fff; font-family: 'Inter', sans-serif; font-size: 14px; padding: 10px 14px; outline: none; transition: border-color .2s, box-shadow .2s; }
+    input::placeholder { color: rgba(255,255,255,0.5); }
+    input:focus { border-color: #c78dc7; box-shadow: 0 0 0 3px rgba(199,141,199,0.25); }
+    .input-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+    button { cursor: pointer; border: none; font-family: 'Nunito', sans-serif; font-weight: 700; border-radius: 8px; transition: all .15s; }
     .btn-primary {
-      background: var(--primary); color: #fff;
-      font-size: 14px; padding: 10px 24px;
-      white-space: nowrap;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+      background: linear-gradient(135deg, #8b5cf6, #c78dc7);
+      color: #fff; font-size: 14px; padding: 12px 24px; white-space: nowrap;
+      border-radius: 999px; box-shadow: 0 4px 14px rgba(139,92,246,.4);
+      transition: transform .15s ease, box-shadow .15s ease;
     }
-
-    .btn-primary:hover { background: var(--primary-dark); }
-    .btn-primary:active { transform: scale(.98); }
-    .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-
-    .btn-icon {
-      background: var(--white);
-      border: 1.5px solid var(--border);
-      color: var(--text-mid);
-      font-size: 12px; padding: 7px 13px;
-      display: flex; align-items: center; gap: 6px;
-      font-weight: 600;
-    }
-
-    .btn-icon:hover { border-color: var(--primary); color: var(--primary); }
-
-    /* ── Status bar ── */
-    .status-bar {
-      display: none;
-      align-items: center; gap: 10px;
-      padding: 10px 14px; border-radius: 8px;
-      font-size: 13px; font-weight: 600;
-      margin-top: 14px;
-    }
-
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,107,107,.45); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .btn-primary.btn-pink { background: linear-gradient(135deg, #fb7185, #f496a6); box-shadow: 0 4px 14px rgba(251,113,133,.4); }
+    .status-bar { display: none; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-top: 14px; }
     .status-bar.loading { display: flex; background: #f5f3ff; border: 1px solid #ddd6fe; color: var(--info); }
-    .status-bar.error   { display: flex; background: #fef2f2; border: 1px solid #fecaca; color: var(--warn); }
+    .status-bar.error { display: flex; background: #fef2f2; border: 1px solid #fecaca; color: var(--warn); }
     .status-bar.success { display: flex; background: #f0fdf4; border: 1px solid #bbf7d0; color: var(--success); }
-
     .spinner {
-      width: 14px; height: 14px; flex-shrink: 0;
-      border: 2px solid rgba(109,40,217,.2);
-      border-top-color: var(--info);
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
+      width: 16px; height: 16px; flex-shrink: 0; border-radius: 50%;
+      background: linear-gradient(to bottom, #ff6b6b 0% 48%, #1a0a2e 48% 52%, #fff 52% 100%);
+      border: 2px solid #1a0a2e;
+      position: relative;
+      animation: spin .8s linear infinite;
     }
-
+    .spinner::after {
+      content: ''; position: absolute; top: 50%; left: 50%; width: 5px; height: 5px;
+      background: #fff; border: 1.5px solid #1a0a2e; border-radius: 50%; transform: translate(-50%, -50%);
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Conversation card ── */
-    .conv-card {
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      display: none;
-      box-shadow: var(--shadow);
-      animation: fadeUp .3s ease both;
+    @keyframes ghost-float {
+      0%, 100% { transform: translateY(0) rotate(-3deg); }
+      50% { transform: translateY(-22px) rotate(3deg); }
     }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: translateY(0); }
+    .ghost-deco { position: fixed; pointer-events: none; z-index: 0; opacity: .35; animation: ghost-float 6s ease-in-out infinite; }
+    .ghost-deco circle { fill: #2e0a4e; opacity: .6; }
+    .ghost-deco path { fill: currentColor; }
+    .ghost-deco--1 { width: 64px; top: 8%; right: 6%; color: #c78dc7; animation-duration: 7s; }
+    .ghost-deco--2 { width: 46px; bottom: 16%; left: 4%; color: #f496a6; animation-duration: 5.5s; animation-delay: 1s; }
+    .ghost-deco--3 { width: 38px; top: 42%; left: -2%; color: #ff6b6b; animation-duration: 6.5s; animation-delay: 2s; }
+    .ghost-deco--4 { width: 56px; bottom: 8%; right: 10%; color: #8b5cf6; animation-duration: 8s; animation-delay: .5s; }
+    @media (max-width: 640px) { .ghost-deco { display: none; } }
+    .gengar-corner {
+      position: fixed; bottom: 16px; right: 16px; width: 150px; z-index: 0;
+      pointer-events: none; filter: drop-shadow(0 8px 18px rgba(0,0,0,.35));
     }
+    @media (max-width: 640px) { .gengar-corner { width: 86px; bottom: 10px; right: 10px; } }
 
-    .conv-card.visible { display: block; }
-
-    /* ── Conv header ── */
-    .conv-header {
-      padding: 16px 24px;
-      border-bottom: 1px solid var(--border);
-      display: flex; flex-wrap: wrap;
-      align-items: center; justify-content: space-between;
-      gap: 12px;
-      background: var(--white);
+    /* 🔽 ADICIONADO AQUI: Corrige cores das opções do select */
+    select {
+      color: #fff !important;
+      background-color: rgba(46, 10, 78, 0.9) !important;
     }
-
-    .conv-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-
-    .badge {
-      font-size: 11px; font-weight: 700;
-      padding: 3px 10px; border-radius: 20px;
-      font-family: 'Nunito', sans-serif;
+    select option {
+      color: #fff !important;
+      background-color: #2e0a4e !important;
     }
-
-    .badge-green  { background: #dcfce7; color: #166534; }
-    .badge-blue   { background: #ede9fe; color: #5b21b6; }
-    .badge-orange { background: #fff7ed; color: #c2410c; }
-    .badge-muted  { background: #f1f3f6; color: var(--text-mid); }
-
-    .conv-actions { display: flex; gap: 8px; }
-
-    /* ── Info grid ── */
-    .info-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      border-bottom: 1px solid var(--border);
-      background: #fafbfc;
-    }
-
-    .info-cell {
-      padding: 12px 18px;
-      border-right: 1px solid var(--border);
-    }
-
-    .info-cell:last-child { border-right: none; }
-
-    .info-key {
-      font-size: 10px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: .08em;
-      color: var(--muted); margin-bottom: 3px;
-    }
-
-    .info-val {
-      font-size: 13px; color: var(--text);
-      font-weight: 500;
-      word-break: break-all;
-    }
-
-    /* ── Chat window ── */
-    .chat-window {
-      background: #f0f2f5;
-      padding: 20px 20px 24px;
-      display: flex; flex-direction: column; gap: 6px;
-      max-height: 600px;
-      overflow-y: auto;
-    }
-
-    .chat-window::-webkit-scrollbar { width: 5px; }
-    .chat-window::-webkit-scrollbar-track { background: transparent; }
-    .chat-window::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
-
-    /* ── Message rows ── */
-    .msg-row {
-      display: flex;
-      flex-direction: column;
-      max-width: 70%;
-    }
-
-    /* Cliente: esquerda */
-    .msg-row.client {
-      align-self: flex-start;
-      align-items: flex-start;
-    }
-
-    /* Agente: direita */
-    .msg-row.agent {
-      align-self: flex-end;
-      align-items: flex-end;
-    }
-
-    /* Sistema/bot: centralizado */
-    .msg-row.system,
-    .msg-row.bot {
-      align-self: center;
-      align-items: center;
-      max-width: 80%;
-    }
-
-    .msg-sender {
-      font-size: 11px; font-weight: 700;
-      color: var(--muted);
-      margin-bottom: 3px;
-      padding: 0 4px;
-    }
-
-    .msg-bubble {
-      padding: 9px 14px;
-      font-size: 14px; line-height: 1.55;
-      word-break: break-word;
-      position: relative;
-    }
-
-    /* Bolha do cliente */
-    .msg-row.client .msg-bubble {
-      background: var(--bubble-client-bg);
-      color: var(--bubble-client-txt);
-      border-radius: 0 14px 14px 14px;
-      border: 1px solid #e0e3ea;
-    }
-
-    /* Bolha do agente */
-    .msg-row.agent .msg-bubble {
-      background: var(--bubble-agent-bg);
-      color: var(--bubble-agent-txt);
-      border-radius: 14px 0 14px 14px;
-    }
-
-    /* Bolha de sistema */
-    .msg-row.system .msg-bubble,
-    .msg-row.bot .msg-bubble {
-      background: #fff8e1;
-      color: #7a5800;
-      border-radius: 8px;
-      border: 1px solid #ffe082;
-      font-size: 12px;
-      text-align: center;
-      padding: 7px 16px;
-    }
-
-    .msg-bubble img {
-      max-width: 100%; border-radius: 8px; margin-top: 6px; display: block;
-    }
-
-    .msg-bubble a { color: inherit; text-decoration: underline; }
-
-    .msg-time {
-      font-size: 10px;
-      color: var(--muted);
-      margin-top: 3px;
-      padding: 0 4px;
-    }
-
-    /* Grupo de mensagens do mesmo remetente — espaçamento extra entre trocas */
-    .msg-row + .msg-row { margin-top: 2px; }
-    .msg-row.group-start { margin-top: 12px; }
-
-    /* ── Empty state ── */
-    .empty {
-      text-align: center;
-      padding: 48px 20px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    /* ── Claude analysis ── */
-    .analysis-card {
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      display: none;
-      box-shadow: var(--shadow);
-      animation: fadeUp .3s ease both;
-      margin-top: 20px;
-    }
-
-    .analysis-card.visible { display: block; }
-
-    .analysis-header {
-      padding: 16px 24px;
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-      flex-wrap: wrap; gap: 10px;
-      background: #fafbfc;
-    }
-
-    .analysis-title {
-      font-family: 'Nunito', sans-serif;
-      font-size: 13px; font-weight: 700;
-      color: var(--text);
-      text-transform: uppercase; letter-spacing: .06em;
-      display: flex; align-items: center; gap: 8px;
-    }
-
-    .analysis-title svg { color: var(--primary); }
-
-    .analysis-body {
-      padding: 24px 28px;
-      font-size: 14px; line-height: 1.8;
-      color: var(--text);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .btn-claude {
-      background: var(--primary);
-      border: none;
-      color: #fff;
-      font-size: 13px; padding: 8px 18px;
-      display: flex; align-items: center; gap: 7px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: 'Nunito', sans-serif;
-      font-weight: 700;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-
-    .btn-claude:hover { background: var(--primary-dark); }
-    .btn-claude:disabled { opacity: .5; cursor: not-allowed; }
-
-    .btn-download {
-      background: var(--white);
-      border: 1.5px solid var(--border);
-      color: var(--text-mid);
-      font-size: 12px; padding: 7px 13px;
-      display: none;
-      align-items: center; gap: 6px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: 'Nunito', sans-serif;
-      font-weight: 700;
-      transition: all .15s;
-    }
-    .btn-download.visible { display: flex; }
-    .btn-download:hover { border-color: var(--primary); color: var(--primary); }
-
-    .btn-notebook {
-      background: var(--white);
-      border: 1.5px solid #7c3aed;
-      color: #7c3aed;
-      font-size: 12px; padding: 7px 14px;
-      display: none;
-      align-items: center; gap: 6px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: 'Nunito', sans-serif;
-      font-weight: 700;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .btn-notebook.visible { display: flex; }
-    .btn-notebook:hover { background: #f5f3ff; }
-    .btn-notebook:disabled { opacity: .5; cursor: not-allowed; }
-
-    .analysis-spinner {
-      width: 14px; height: 14px; flex-shrink: 0;
-      border: 2px solid rgba(255,255,255,.35);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      display: none;
-    }
-
-    /* ── Toast ── */
-    .toast {
-      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
-      padding: 11px 22px; border-radius: 8px;
-      font-size: 13px; font-weight: 600;
-      display: none; align-items: center; gap: 8px;
-      z-index: 999; animation: fadeUp .25s ease;
-      white-space: nowrap;
-    }
-    .toast.success { display: flex; background: #f0fdf4; border: 1px solid #bbf7d0; color: var(--success); box-shadow: var(--shadow-lg); }
-    .toast.error   { display: flex; background: #fef2f2; border: 1px solid #fecaca; color: var(--warn);    box-shadow: var(--shadow-lg); }
-
-    /* ── Footer ── */
-    footer {
-      margin-top: 40px;
-      font-size: 12px; color: var(--muted);
-      text-align: center;
-    }
-
-    footer span { color: var(--primary); font-weight: 600; }
   </style>
 </head>
 <body>
 <div class="wrap">
 
+<svg class="ghost-deco ghost-deco--1" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4C46 4 56 16 56 30v26c0 0-5-7-11 0-6 7-11-7-17 0-6 7-11 0-11 0V30C8 16 18 4 32 4z"/><circle cx="24" cy="27" r="4"/><circle cx="40" cy="27" r="4"/></svg>
+<svg class="ghost-deco ghost-deco--2" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4C46 4 56 16 56 30v26c0 0-5-7-11 0-6 7-11-7-17 0-6 7-11 0-11 0V30C8 16 18 4 32 4z"/><circle cx="24" cy="27" r="4"/><circle cx="40" cy="27" r="4"/></svg>
+<svg class="ghost-deco ghost-deco--3" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4C46 4 56 16 56 30v26c0 0-5-7-11 0-6 7-11-7-17 0-6 7-11 0-11 0V30C8 16 18 4 32 4z"/><circle cx="24" cy="27" r="4"/><circle cx="40" cy="27" r="4"/></svg>
+<svg class="ghost-deco ghost-deco--4" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4C46 4 56 16 56 30v26c0 0-5-7-11 0-6 7-11-7-17 0-6 7-11 0-11 0V30C8 16 18 4 32 4z"/><circle cx="24" cy="27" r="4"/><circle cx="40" cy="27" r="4"/></svg>
+
+<img class="gengar-corner" src="/Gengar Gif.gif" alt="" aria-hidden="true">
+
   <header>
-    <div class="logo-row">
-      <div class="logo-icon">
-        <svg viewBox="0 0 20 20" fill="none">
-          <path d="M3 5h14M3 10h10M3 15h7" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <span class="logo-text">Freshchat Viewer</span>
-    </div>
-    <h1>Visualizador de <span>Conversa</span></h1>
-    <p class="subtitle">Cole o link ou ID de um atendimento e veja todas as mensagens organizadas.</p>
+    <h1>Processador de <span>Atendimentos</span></h1>
+    <p class="subtitle">Cole o(s) link(s) ou ID(s) de atendimento, veja um resumo rápido e processe para o Google Docs.</p>
   </header>
 
   <div class="card">
-    <div class="card-title">Conversa</div>
+    <div class="card-title">Atendimentos</div>
     <div class="field">
-      <label>Link ou ID da conversa</label>
-      <div class="input-row">
-        <input type="text" id="convInput" placeholder="https://… ou conversation_id direto"/>
-        <button class="btn-primary" id="loadBtn" onclick="loadConversation()">Carregar</button>
+      <label>Link(s) da conversa (um por linha)</label>
+      <textarea id="convInput" placeholder="https://…&#10;https://…&#10;https://…" rows="3" style="width:100%; padding:10px; border-radius:8px; background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.25); color:#fff; font-family:'Inter',sans-serif; font-size:14px; resize:vertical;"></textarea>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="apiKeySelect" style="color: var(--text-mid); font-size: 13px; font-weight: 600;">API Gemini:</label>
+          <select id="apiKeySelect" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.25); color: #fff; font-family: 'Inter', sans-serif; font-size: 13px;">
+            <option value="1">Conta 1</option>
+            <option value="2">Conta 2</option>
+            <option value="3">Conta 3</option>
+            <option value="4">Conta 4</option>
+            <option value="5">Conta 5</option>
+          </select>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="docThemeSelect" style="color: var(--text-mid); font-size: 13px; font-weight: 600;">Documento:</label>
+          <select id="docThemeSelect" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.25); color: #fff; font-family: 'Inter', sans-serif; font-size: 13px;">
+            <option value="NFP">NFP</option>
+            <option value="NF">NF</option>
+            <option value="GONUTRI">GONUTRI</option>
+            <option value="IA">IA</option>
+            <option value="RELATORIOS">RELATÓRIOS</option>
+            <option value="CRM">CRM</option>
+            <option value="PASS">PASS</option>
+            <option value="WOD">WOD</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:10px;">
+        <button class="btn-primary" id="previewBatchBtn" onclick="previewBatch()" style="flex:1;">
+          <svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><path d="M32 4C46 4 56 16 56 30v26c0 0-5-7-11 0-6 7-11-7-17 0-6 7-11 0-11 0V30C8 16 18 4 32 4z"/><circle cx="24" cy="27" r="4" fill="#2e0a4e"/><circle cx="40" cy="27" r="4" fill="#2e0a4e"/></svg>
+          Pré-visualizar
+        </button>
+        <button class="btn-primary btn-pink" id="processBatchBtn" onclick="processBatch()" style="flex:1;">
+          <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="28" fill="#fff"/><path d="M4 32a28 28 0 0 1 56 0z" fill="#ff5a6a"/><rect x="4" y="29" width="56" height="6" fill="#1a0a2e"/><circle cx="32" cy="32" r="8" fill="#fff" stroke="#1a0a2e" stroke-width="4"/></svg>
+          Processar Todas
+        </button>
       </div>
     </div>
     <div class="status-bar" id="statusBar">
@@ -531,70 +190,18 @@
     </div>
   </div>
 
-  <div class="conv-card" id="convCard">
-
-    <div class="conv-header">
-      <div class="conv-meta" id="convMeta"></div>
-      <div class="conv-actions">
-        <button class="btn-icon" onclick="copyTranscript()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          Copiar transcrição
-        </button>
-        <button class="btn-claude" id="analyzeBtn" onclick="analyzeWithClaude()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><circle cx="19" cy="5" r="3" fill="currentColor" stroke="none"/></svg>
-          <div class="analysis-spinner" id="analyzeSpinner"></div>
-          Analisar com Gemini
-        </button>
-      </div>
-    </div>
-
-    <div class="info-grid" id="infoGrid"></div>
-
-    <div class="chat-window" id="msgList"></div>
-
+  <div class="card" id="previewCard" style="display:none;">
+    <div class="card-title">👻 Pré-visualização dos Atendimentos</div>
+    <div id="previewList"></div>
   </div>
-
-  <div class="analysis-card" id="analysisCard">
-    <div class="analysis-header">
-      <div class="analysis-title">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-        Análise Gemini
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn-download" id="downloadBtn" onclick="downloadForNotebookLM()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Baixar .txt
-        </button>
-        <button class="btn-notebook" id="notebookBtn" onclick="importToNotebookLM()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-          Importar para NotebookLM
-        </button>
-      </div>
-    </div>
-    <div class="analysis-body" id="analysisBody"></div>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <footer>Powered by <span>Freshchat API</span> · <span>Claude AI</span></footer>
-
 </div>
 
 <script>
-let transcriptText = '';
-let convMetaText = '';
-let analysisText = '';
-
-// ── Helpers ──────────────────────────────────────────────────────
 function setStatus(type, msg, spin = false) {
   const bar = document.getElementById('statusBar');
   bar.className = 'status-bar ' + type;
   document.getElementById('statusMsg').textContent = msg;
   document.getElementById('spinner').style.display = spin ? 'block' : 'none';
-}
-
-function hideStatus() {
-  document.getElementById('statusBar').className = 'status-bar';
 }
 
 function extractConvId(input) {
@@ -607,374 +214,90 @@ function extractConvId(input) {
   return null;
 }
 
-function fmtDate(str) {
-  if (!str) return '—';
-  const d = new Date(str);
-  if (isNaN(d)) return str;
-  return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-}
-
-function extractTema(analysis) {
-  const match = analysis.match(/Tema:\s*(.+)/i);
-  return match ? match[1].trim() : 'Não identificado';
-}
-
-function extractTicket(analysis) {
-  const match = analysis.match(/Ticket Aberto\?\s*(Sim|Não)/i);
-  const iaResult = match ? match[1].trim() : null;
-  
-  // Fallback por regra de força bruta
-  const ruleResult = detectTicketByRule(transcriptText);
-  
-  // Se a IA disse "Sim", mas não há evidência no texto, corrija para "Não"
-  if (iaResult === 'Sim' && ruleResult === 'Não') {
-    console.log('⚠️ IA detectou Ticket Aberto, mas regra manual não encontrou evidências. Corrigindo para "Não".');
-    return 'Não (corrigido)';
-  }
-  
-  // Se a IA não conseguiu identificar, usa o resultado da regra
-  if (!iaResult) {
-    return ruleResult;
-  }
-  
-  return iaResult;
-}
-
-function detectTicketByRule(transcript) {
-  const lowerText = transcript.toLowerCase();
-  // Procura por evidências textuais claras
-  if (lowerText.includes('freshdesk.com') || lowerText.includes('ticket #') || lowerText.includes('@apoio validar ticket')) {
-    return 'Sim';
-  }
-  return 'Não';
-}
-
-// ── Fetch (via servidor local) ────────────────────────────────────
-async function fetchConversation(convId) {
-  const convRes = await fetch(`/api/conversations/${convId}`);
-  const conv = await convRes.json();
-  if (!convRes.ok) throw new Error(conv.error || `Erro ${convRes.status}`);
-
-  let contact = null;
-  const userId = conv.user_id || conv.assigned_user_id;
-  if (userId) {
+async function previewBatch() {
+  const textarea = document.getElementById('convInput');
+  const links = textarea.value.trim().split('\n').filter(link => link.trim() !== '');
+  if (links.length === 0) { setStatus('error', '⚠️ Cole pelo menos um link.'); return; }
+  const btn = document.getElementById('previewBatchBtn');
+  btn.disabled = true;
+  btn.textContent = 'Gerando pré-visualizações...';
+  const selectedApi = document.getElementById('apiKeySelect').value;
+  const previewCard = document.getElementById('previewCard');
+  const previewList = document.getElementById('previewList');
+  previewList.innerHTML = '';
+  previewCard.style.display = 'block';
+  setStatus('loading', `👁️ Gerando resumos de ${links.length} conversa(s)...`, true);
+  for (let i = 0; i < links.length; i++) {
+    const convId = extractConvId(links[i]);
+    if (!convId) {
+      previewList.innerHTML += `<div class="field" style="border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:12px;"><strong>${i + 1}.</strong> ❌ Link inválido: "${links[i]}"</div>`;
+      continue;
+    }
+    setStatus('loading', `🔄 Resumindo conversa ${i + 1} de ${links.length}...`, true);
     try {
-      const uRes = await fetch(`/api/users/${userId}`);
-      if (uRes.ok) contact = await uRes.json();
-    } catch(_) {}
-  }
-
-  let msgs = [], page = 1;
-  while (true) {
-    const mRes = await fetch(`/api/conversations/${convId}/messages?page=${page}&items_per_page=50`);
-    if (!mRes.ok) break;
-    const mData = await mRes.json();
-    const batch = mData.messages || [];
-    msgs = msgs.concat(batch);
-    if (batch.length < 50 || page >= 6) break;
-    page++;
-  }
-
-  msgs.sort((a, b) => new Date(a.created_time || 0) - new Date(b.created_time || 0));
-
-  return { conv, contact, msgs };
-}
-
-// ── Render ────────────────────────────────────────────────────────
-function render({ conv, contact, msgs }) {
-  const statusColor = {
-    'assigned': 'badge-blue',
-    'resolved': 'badge-green',
-    'open':     'badge-green',
-    'new':      'badge-orange',
-  };
-  const sc = statusColor[(conv.status || '').toLowerCase()] || 'badge-muted';
-
-  const meta = document.getElementById('convMeta');
-  meta.innerHTML = `
-    ${conv.status    ? `<span class="badge ${sc}">${conv.status}</span>` : ''}
-    ${conv.channel_id ? `<span class="badge badge-muted">${conv.channel_id}</span>` : ''}
-    <span class="badge badge-muted">${msgs.length} msgs</span>
-  `;
-
-  const contactName = contact
-    ? [contact.first_name, contact.last_name].filter(Boolean).join(' ') || contact.email || '—'
-    : '—';
-
-  const agentName = (() => {
-    const agentMsg = [...msgs].reverse().find(m => m.actor_type === 'agent');
-    return agentMsg?.actor_name || conv.assigned_agent_id || '—';
-  })();
-
-  const infoItems = [
-    { k: 'ID',         v: conv.id || conv.conversation_id || '—' },
-    { k: 'Contato',    v: contactName },
-    { k: 'Agente',     v: agentName },
-    { k: 'Início',     v: fmtDate(conv.created_time) },
-    { k: 'Atualizado', v: fmtDate(conv.updated_time) },
-    { k: 'Canal',      v: conv.channel_id || '—' },
-  ];
-
-  document.getElementById('infoGrid').innerHTML = infoItems.map(i =>
-    `<div class="info-cell">
-      <div class="info-key">${i.k}</div>
-      <div class="info-val">${i.v}</div>
-    </div>`
-  ).join('');
-
-  convMetaText = infoItems.map(i => `${i.k}: ${i.v}`).join('\n');
-  analysisText = '';
-  document.getElementById('analysisCard').classList.remove('visible');
-  document.getElementById('analysisBody').textContent = '';
-  document.getElementById('downloadBtn').classList.remove('visible');
-  document.getElementById('notebookBtn').classList.remove('visible');
-
-  // ── Messages
-  const list = document.getElementById('msgList');
-
-  if (!msgs.length) {
-    list.innerHTML = `<div class="empty">Nenhuma mensagem encontrada nesta conversa.</div>`;
-    transcriptText = '';
-    return;
-  }
-
-  const lines = [];
-  let prevType = null;
-
-  const bubbles = msgs.map((m, idx) => {
-    const type   = (m.actor_type || '').toLowerCase();
-    const name   = m.actor_name || (type === 'agent' ? 'Agente' : type === 'user' ? 'Cliente' : type);
-    const time   = fmtDate(m.created_time);
-    const isAgent  = type === 'agent';
-    const isSystem = type === 'system' || type === 'bot';
-
-    let content = '';
-    let imgHtml = '';
-
-    (m.message_parts || []).forEach(p => {
-      if (p?.text?.content)   content += p.text.content;
-      if (p?.image?.url)      imgHtml += `<img src="${p.image.url}" alt="imagem"/>`;
-      if (p?.file?.url)       content += `📎 <a href="${p.file.url}" target="_blank">${p.file.name || 'arquivo'}</a>`;
-    });
-
-    if (!content && !imgHtml) return '';
-
-    const label = isAgent ? 'Agente' : isSystem ? 'Sistema' : 'Cliente';
-    if (content) lines.push(`[${label} – ${time}]: ${content}`);
-
-    const rowClass = isAgent ? 'agent' : isSystem ? 'system' : 'client';
-    const isGroupStart = type !== prevType;
-    prevType = type;
-
-    const groupClass = isGroupStart ? 'group-start' : '';
-
-    return `<div class="msg-row ${rowClass} ${groupClass}">
-      ${isGroupStart ? `<div class="msg-sender">${name}</div>` : ''}
-      <div class="msg-bubble">${content}${imgHtml}</div>
-      <div class="msg-time">${time}</div>
-    </div>`;
-  }).filter(Boolean);
-
-  list.innerHTML = bubbles.join('') || `<div class="empty">Nenhuma mensagem com conteúdo de texto.</div>`;
-  transcriptText = lines.join('\n');
-
-  list.scrollTop = list.scrollHeight;
-}
-
-// ── Main ──────────────────────────────────────────────────────────
-async function loadConversation() {
-  const convInput = document.getElementById('convInput').value.trim();
-  if (!convInput) { setStatus('error', '⚠️ Informe o link ou ID da conversa.'); return; }
-
-  const convId = extractConvId(convInput);
-  if (!convId)  { setStatus('error', '⚠️ Não foi possível extrair o ID. Cole o link completo ou apenas o ID.'); return; }
-
-  document.getElementById('loadBtn').disabled = true;
-  document.getElementById('convCard').classList.remove('visible');
-
-  try {
-    setStatus('loading', 'Buscando conversa…', true);
-    const data = await fetchConversation(convId);
-    hideStatus();
-    render(data);
-    document.getElementById('convCard').classList.add('visible');
-    setStatus('success', `✓ ${data.msgs.length} mensagens carregadas.`);
-  } catch (e) {
-    setStatus('error', `❌ ${e.message}`);
-    console.error(e);
-  } finally {
-    document.getElementById('loadBtn').disabled = false;
-  }
-}
-
-async function analyzeWithClaude() {
-  if (!transcriptText) return;
-
-  const btn = document.getElementById('analyzeBtn');
-  const spinner = document.getElementById('analyzeSpinner');
-  const card = document.getElementById('analysisCard');
-  const body = document.getElementById('analysisBody');
-
-  btn.disabled = true;
-  spinner.style.display = 'block';
-  body.textContent = '';
-  card.classList.add('visible');
-  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  try {
-    const res = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript: transcriptText }),
-    });
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const payload = line.slice(6);
-        if (payload === '[DONE]') break;
-
-        try {
-          const { text, error } = JSON.parse(payload);
-          if (error) { body.textContent += `\n[Erro: ${error}]`; break; }
-          if (text) { body.textContent += text; analysisText += text; }
-        } catch (_) {}
-      }
-    }
-  } catch (e) {
-    body.textContent = `Erro ao conectar com Claude: ${e.message}`;
-  } finally {
-    btn.disabled = false;
-    spinner.style.display = 'none';
-    if (analysisText) {
-      document.getElementById('downloadBtn').classList.add('visible');
-      document.getElementById('notebookBtn').classList.add('visible');
-    }
-  }
-}
-
-function showToast(type, msg, ms = 4000) {
-  const t = document.getElementById('toast');
-  t.className = `toast ${type}`;
-  t.textContent = msg;
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => { t.className = 'toast'; }, ms);
-}
-
-function buildFileContent() {
-  return [
-    '=== INFORMAÇÕES DA CONVERSA ===',
-    convMetaText,
-    '',
-    '=== ANÁLISE DO ATENDIMENTO (gerada por Claude AI) ===',
-    '',
-    analysisText,
-    '',
-    '=== TRANSCRIÇÃO COMPLETA ===',
-    '',
-    transcriptText,
-  ].join('\n');
-}
-
-async function importToNotebookLM() {
-  if (!analysisText) return;
-
-  const btn = document.getElementById('notebookBtn');
-  btn.disabled = true;
-  btn.textContent = 'Enviando…';
-
-  const statusRes = await fetch('/api/google/status');
-  const { authed } = await statusRes.json();
-
-  if (!authed) {
-    const popup = window.open('/auth/google', 'google-auth', 'width=500,height=600');
-    await new Promise((resolve, reject) => {
-      window.addEventListener('message', function handler(e) {
-        if (e.data?.googleAuth === 'ok') { window.removeEventListener('message', handler); resolve(); }
-        if (e.data?.googleAuth === 'error') { window.removeEventListener('message', handler); reject(new Error(e.data.msg)); }
+      const res = await fetch('/api/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ convId, apiKeyIndex: selectedApi })
       });
-      const check = setInterval(() => { if (popup.closed) { clearInterval(check); reject(new Error('Autenticação cancelada')); } }, 500);
-    }).catch(e => { showToast('error', `❌ ${e.message}`); btn.disabled = false; btn.innerHTML = notebookBtnHTML(); throw e; });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      previewList.innerHTML += `
+        <div class="field" style="border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:12px;">
+          <div style="font-weight:700; color:#fff; margin-bottom:4px;">${i + 1}. ${data.contactName} <span style="color:var(--muted); font-weight:400; font-size:12px;">(${data.msgCount} msgs)</span></div>
+          <div style="font-size:13px; color:var(--text-mid); margin-bottom:4px;">${data.resumo}</div>
+          <a href="${data.convLink}" target="_blank" style="font-size:12px; color:var(--primary);">Abrir atendimento</a>
+        </div>`;
+    } catch (e) {
+      previewList.innerHTML += `<div class="field" style="border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:12px;"><strong>${i + 1}.</strong> ❌ ${e.message}</div>`;
+    }
   }
+  setStatus('success', `✓ Pré-visualização concluída.`);
+  btn.disabled = false;
+  btn.textContent = '👁️ Pré-visualizar';
+}
 
-  try {
-    // Extrai tema e ticket da análise gerada
-    const tema = extractTema(analysisText);
-    const ticket = extractTicket(analysisText);
-    const metaCompleto = `${convMetaText}\nTema: ${tema}\nTicket Aberto? ${ticket}`;
-
-    const res = await fetch('/api/google/upload', {
+async function processBatch() {
+  const textarea = document.getElementById('convInput');
+  const links = textarea.value.trim().split('\n').filter(link => link.trim() !== '');
+  if (links.length === 0) { setStatus('error', '⚠️ Cole pelo menos um link.'); return; }
+  const btn = document.getElementById('processBatchBtn');
+  btn.disabled = true;
+  btn.textContent = 'Processando...';
+  setStatus('loading', `⚙️ Iniciando processamento de ${links.length} conversa(s)...`, true);
+  const selectedApi = document.getElementById('apiKeySelect').value;
+  const selectedDoc = document.getElementById('docThemeSelect').value;
+  for (let i = 0; i < links.length; i++) {
+    const convId = extractConvId(links[i]);
+    if (!convId) {
+      setStatus('error', `❌ Link inválido na linha ${i + 1}: "${links[i]}". Processamento interrompido.`);
+      btn.disabled = false;
+      btn.textContent = '⚡ Processar Todas';
+      return;
+    }
+    setStatus('loading', `🔄 Processando conversa ${i + 1} de ${links.length}...`, true);
+    const res = await fetch('/api/batch-process', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ meta: metaCompleto, analysis: analysisText, transcript: transcriptText }),
+      body: JSON.stringify({
+        convId: convId,
+        apiKeyIndex: selectedApi,
+        docTheme: selectedDoc
+      })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-    showToast('success', '✓ Atendimento adicionado ao Google Doc!');
-  } catch (e) {
-    showToast('error', `❌ ${e.message}`);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = notebookBtnHTML();
+    if (!res.ok) {
+      const err = await res.json();
+      setStatus('error', `❌ Erro na conversa ${i + 1}: ${err.error}`);
+      btn.disabled = false;
+      btn.textContent = '⚡ Processar Todas';
+      return;
+    }
+    await new Promise(resolve => setTimeout(resolve, 1500));
   }
+  setStatus('success', `✅ Processamento concluído! ${links.length} conversa(s) adicionada(s) ao Google Docs.`);
+  btn.disabled = false;
+  btn.textContent = '⚡ Processar Todas';
 }
-
-function notebookBtnHTML() {
-  return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> Importar para NotebookLM`;
-}
-
-function downloadForNotebookLM() {
-  if (!analysisText) return;
-
-  const content = [
-    '=== INFORMAÇÕES DA CONVERSA ===',
-    convMetaText,
-    '',
-    '=== ANÁLISE DO ATENDIMENTO (gerada por Claude AI) ===',
-    '',
-    analysisText,
-    '',
-    '=== TRANSCRIÇÃO COMPLETA ===',
-    '',
-    transcriptText,
-  ].join('\n');
-
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `atendimento-${Date.now()}.txt`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function copyTranscript() {
-  if (!transcriptText) return;
-  navigator.clipboard.writeText(transcriptText).then(() => {
-    const btn = document.querySelector('.btn-icon');
-    btn.textContent = '✓ Copiado!';
-    setTimeout(() => {
-      btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar transcrição`;
-    }, 2000);
-  });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('convInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') loadConversation();
-  });
-});
 </script>
 </body>
 </html>

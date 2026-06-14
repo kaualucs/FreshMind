@@ -18,16 +18,33 @@ const FC_APP_ID = (process.env.FRESHCHAT_APP_ID || '').trim();
 if (!FC_TOKEN) console.warn('⚠️  Configure FRESHCHAT_API_KEY no .env');
 console.log(`→ API base: ${FC_BASE}`);
 
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Função para obter a chave Gemini correta
+function getGenAI(apiKeyIndex) {
+  const keyNumber = apiKeyIndex || '1';
+  const apiKey = process.env[`GEMINI_API_KEY_${keyNumber}`] || process.env.GEMINI_API_KEY;
+  return new GoogleGenAI({ apiKey });
+}
+
+// Função para obter o ID do documento Google com base no tema
+function getDocId(tema) {
+  const keyMap = {
+    'NFP': 'GOOGLE_DOC_ID_NFP',
+    'NF': 'GOOGLE_DOC_ID_NF',
+    'GONUTRI': 'GOOGLE_DOC_ID_GONUTRI',
+    'IA': 'GOOGLE_DOC_ID_IA',
+    'RELATORIOS': 'GOOGLE_DOC_ID_RELATORIOS',
+    'CRM': 'GOOGLE_DOC_ID_CRM',
+    'PASS': 'GOOGLE_DOC_ID_PASS',
+    'WOD': 'GOOGLE_DOC_ID_WOD'
+  };
+  const envKey = keyMap[tema];
+  return process.env[envKey] || process.env.GOOGLE_DOC_ID; // fallback para o padrão
+}
 
 // ── Google OAuth ──────────────────────────────────────────────────────────────
 
 const TOKENS_FILE = path.join(__dirname, '.google-tokens.json');
 const REDIRECT_URI = `http://localhost:${PORT}/auth/google/callback`;
-
-// Aceita tanto o ID puro quanto a URL completa do Google Docs
-const _rawDocId = (process.env.GOOGLE_DOC_ID || '').trim();
-const GOOGLE_DOC_ID = _rawDocId.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1] ?? _rawDocId.split('/')[0];
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -140,7 +157,6 @@ app.post('/api/analyze', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   try {
-
     const prompt = `
 Contexto e Persona:
 Você é um Analista Sênior de QA de Atendimento. Sua função é processar transcrições de suporte para extrair dados estruturados e operacionais, focando na resolução técnica e eliminando ruídos (cumprimentos e conversas irrelevantes).
@@ -176,7 +192,9 @@ Resultado Final: Como o atendimento foi encerrado.
 TRANSCRIÇÃO:
 ${transcript}`;
 
-    const result = await genAI.models.generateContentStream({
+    const { apiKeyIndex } = req.body;
+    const dynamicGenAI = getGenAI(apiKeyIndex);
+    const result = await dynamicGenAI.models.generateContentStream({
       model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
@@ -194,6 +212,228 @@ ${transcript}`;
     console.error('Gemini error:', e.message);
     res.write(`data: ${JSON.stringify({ error: e.message })}\n\n`);
     res.end();
+  }
+});
+
+// ── Preview (resumo curto antes de processar) ────────────────────────────────
+app.post('/api/preview', async (req, res) => {
+  const { convId, apiKeyIndex } = req.body;
+  if (!convId) return res.status(400).json({ error: 'ID da conversa ausente' });
+
+  try {
+    let convIdOriginal = convId;
+    if (/^\d+$/.test(convIdOriginal)) {
+      const convTemp = await fcFetch(`${FC_BASE}/conversations/${convIdOriginal}`);
+      convIdOriginal = convTemp.id || convTemp.conversation_id || convIdOriginal;
+    }
+
+    const conv = await fcFetch(`${FC_BASE}/conversations/${convIdOriginal}`);
+    const msgsRes = await fcFetch(`${FC_BASE}/conversations/${convIdOriginal}/messages?page=1&items_per_page=50&app_id=${FC_APP_ID}`);
+    const msgs = msgsRes.messages || [];
+    msgs.sort((a, b) => new Date(a.created_time || 0) - new Date(b.created_time || 0));
+
+    const transcript = msgs.map(m => {
+      const type = (m.actor_type || '');
+      const label = type === 'agent' ? '[Agente]' : (type === 'system' || type === 'bot' ? '[Sistema]' : '[Cliente]');
+      const time = m.created_time ? new Date(m.created_time).toLocaleString('pt-BR') : '';
+      const content = (m.message_parts || []).map(p => p?.text?.content).filter(Boolean).join(' ');
+      return `${label} – ${time}: ${content}`;
+    }).join('\n');
+
+    let contactName = conv.user_name || null;
+    if (!contactName && conv.user_id) {
+      try {
+        const userRes = await fcFetch(`${FC_BASE}/users/${conv.user_id}`);
+        contactName = [userRes.first_name, userRes.last_name].filter(Boolean).join(' ') || userRes.email || conv.user_id;
+      } catch (_) {
+        contactName = conv.user_id;
+      }
+    }
+    contactName = contactName || '—';
+
+    const prompt = `Você é um assistente que cria resumos curtos de atendimentos de suporte ao cliente.
+Leia a transcrição abaixo e escreva um resumo BEM CURTO (no máximo 3 frases), em português, explicando:
+- O que o cliente queria/precisava
+- Sobre o que, em geral, a conversa tratou
+- Qual foi a resolução, se houve
+
+Responda apenas com o resumo em texto corrido, sem markdown, sem títulos e sem listas.
+
+TRANSCRIÇÃO:
+${transcript}`;
+
+    const dynamicGenAI = getGenAI(apiKeyIndex);
+    const result = await dynamicGenAI.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+
+    const convLink = `https://sistemanextfit.freshchat.com/a/${FC_APP_ID}/inbox/0/conversation/${conv.id || conv.conversation_id}`;
+
+    res.json({
+      convId,
+      contactName,
+      convLink,
+      msgCount: msgs.length,
+      resumo: (result.text || '').trim(),
+    });
+  } catch (e) {
+    console.error('Erro no preview:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Batch Process ──────────────────────────────────────────────────────────────
+app.post('/api/batch-process', async (req, res) => {
+  const { convId, docTheme } = req.body;
+  if (!convId) return res.status(400).json({ error: 'ID da conversa ausente' });
+
+  try {
+    // 1. Busca a conversa (converte ID numérico se necessário)
+    let convIdOriginal = convId;
+    if (/^\d+$/.test(convIdOriginal)) {
+      const convTemp = await fcFetch(`${FC_BASE}/conversations/${convIdOriginal}`);
+      convIdOriginal = convTemp.id || convTemp.conversation_id || convIdOriginal;
+      console.log(`Resolvido ID numérico → UUID: ${convIdOriginal}`);
+    }
+
+    const conv = await fcFetch(`${FC_BASE}/conversations/${convIdOriginal}`);
+    const msgsRes = await fcFetch(`${FC_BASE}/conversations/${convIdOriginal}/messages?page=1&items_per_page=50&app_id=${FC_APP_ID}`);
+    const msgs = msgsRes.messages || [];
+    msgs.sort((a, b) => new Date(a.created_time || 0) - new Date(b.created_time || 0));
+
+    // 2. Monta a transcrição
+    const transcript = msgs.map(m => {
+      const type = (m.actor_type || '');
+      const label = type === 'agent' ? '[Agente]' : (type === 'system' || type === 'bot' ? '[Sistema]' : '[Cliente]');
+      const time = m.created_time ? new Date(m.created_time).toLocaleString('pt-BR') : '';
+      const content = (m.message_parts || []).map(p => p?.text?.content).filter(Boolean).join(' ');
+      return `${label} – ${time}: ${content}`;
+    }).join('\n');
+
+    // 3. Meta (cabeçalho para o Google Docs)
+    let contactName = conv.user_name || null;
+    if (!contactName && conv.user_id) {
+      try {
+        const userRes = await fcFetch(`${FC_BASE}/users/${conv.user_id}`);
+        contactName = [userRes.first_name, userRes.last_name].filter(Boolean).join(' ') || userRes.email || conv.user_id;
+      } catch (_) {
+        contactName = conv.user_id;
+      }
+    }
+    contactName = contactName || '—';
+
+    let agentName = conv.assigned_agent_name || null;
+    if (!agentName && conv.assigned_agent_id) {
+      try {
+        const agentRes = await fcFetch(`${FC_BASE}/agents/${conv.assigned_agent_id}`);
+        agentName = [agentRes.first_name, agentRes.last_name].filter(Boolean).join(' ') || agentRes.email || conv.assigned_agent_id;
+      } catch (_) {
+        agentName = conv.assigned_agent_id;
+      }
+    }
+    agentName = agentName || '—';
+
+    const convLink = `https://sistemanextfit.freshchat.com/a/${FC_APP_ID}/inbox/0/conversation/${conv.id || conv.conversation_id}`;
+    const meta = `Contato: ${contactName}\nAgente: ${agentName}\nInício: ${new Date(conv.created_time).toLocaleString('pt-BR')}\nAtendimento: ${convLink}`;
+    
+    // 4. Análise com Gemini (não-streaming)
+    const prompt = `Contexto e Persona:
+Você é um Analista Sênior de QA de Atendimento. Sua função é processar transcrições de suporte para extrair dados estruturados e operacionais, focando na resolução técnica e eliminando ruídos (cumprimentos e conversas irrelevantes).
+Diretrizes de Classificação:
+Ao identificar o TEMA, utilize estritamente uma das opções abaixo:
+NFP, Agenda/Grades, Cadastros/Contratos, Wellhub/TotalPass, Treinos/Financeiro, CRM, Relatórios, Loja, Loja - Wellhub, Loja - TotalPass, Loja - GoNutri, Loja - App do Aluno, Loja - Notas fiscais, Loja - Pingo | Plug, Outros, Administrativo, Multiunidade, Migração, desktop e Web, Importação de planilha, Alteração cadastral, Reembolso Next Fit, CSM - Engajamento, CSM - Retenção, Equipamentos - Catracas ou Backup de dados.
+Identificação de Ticket:
+Sua tarefa é identificar se um ticket de atendimento foi ABERTO durante a conversa. Seja extremamente rigoroso.
+Responda "Sim" APENAS se encontrar evidência explícita de que um ticket foi gerado, como:
+- Uma mensagem do sistema ou agente contendo um link do Freshdesk (ex: "https://...freshdesk.com/...").
+- Uma menção direta a um número de ticket ou protocolo (ex: "Ticket #12345").
+- O uso de comandos como @APOIO VALIDAR TICKET.
+Responda "Não" em todos os outros casos, incluindo:
+- Se o agente apenas mencionou que "vai verificar" ou "vai reportar".
+- Se houve apenas um encaminhamento interno não documentado.
+- Se não houver uma evidência clara e textual da abertura do ticket na transcrição fornecida.
+Sua resposta final nesse campo deve ser apenas "Sim" ou "Não".
+Estrutura do Relatório (Markdown):
+0. METADADOS DO ATENDIMENTO
+Cliente: [Nome]
+Agente: [Nome]
+Link do Atendimento: [URL]
+Data/Horário: [Data e Hora]
+Tema: [Escolher da lista fornecida]
+Ticket Aberto? [Sim/Não]
+1. DOR DO CLIENTE
+Descreva o problema central, o impacto no uso do sistema e o nível de urgência apresentado pelo cliente.
+2. RESOLUÇÃO DO AGENTE (SISTEMA)
+Diagnóstico: O que foi identificado como causa.
+Ações no Sistema: Lista numerada com o passo a passo exato das configurações, cliques ou alterações que o agente realizou para resolver o caso.
+Resultado Final: Como o atendimento foi encerrado.
+
+TRANSCRIÇÃO:
+${transcript}`;
+
+    const { apiKeyIndex } = req.body;
+    const dynamicGenAI = getGenAI(apiKeyIndex);
+    const result = await dynamicGenAI.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+    const analysis = result.text;
+
+    // 5. Salva no Google Docs
+    const docId = getDocId(docTheme || 'DEFAULT');
+    if (!docId) return res.status(500).json({ error: 'ID do documento não configurado para este tema' });
+
+    const docs = google.docs({ version: 'v1', auth: oauth2Client });
+    const doc = await docs.documents.get({ documentId: docId });
+    const bodyContent = doc.data.body.content;
+    const endIndex = bodyContent[bodyContent.length - 1].endIndex - 1;
+
+    const now = new Date().toLocaleString('pt-BR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+
+    const ticket = extractTicket(analysis);
+    const tema = extractTema(analysis);
+    const block = [
+      '',
+      '════════════════════════════════════════════════════════════',
+      `ATENDIMENTO — ${now}`,
+      '════════════════════════════════════════════════════════════',
+      '',
+      '[ INFORMAÇÕES DA CONVERSA ]',
+      meta,
+      `Tema: ${tema}`,
+      `Ticket Aberto? ${ticket}`,
+      '',
+      '────────────────────────────────────────────────────────────',
+      'DOR DO CLIENTE',
+      '────────────────────────────────────────────────────────────',
+      '',
+      extractDor(analysis),
+      '',
+      '────────────────────────────────────────────────────────────',
+      'RESOLUÇÃO DO AGENTE',
+      '────────────────────────────────────────────────────────────',
+      '',
+      extractResolucao(analysis),
+      '',
+    ].join('\n');
+
+    await docs.documents.batchUpdate({
+      documentId: docId,
+      requestBody: {
+        requests: [{ insertText: { location: { index: endIndex }, text: block } }],
+      },
+    });
+
+    console.log(`✓ Atendimento ${convId} processado e adicionado ao Google Doc (${docId})`);
+    res.json({ ok: true });
+
+  } catch (e) {
+    console.error('Erro no processamento:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -235,16 +475,17 @@ app.get('/auth/google/callback', async (req, res) => {
 app.post('/api/google/upload', async (req, res) => {
   if (!isGoogleAuthed()) return res.status(401).json({ error: 'Não autenticado no Google' });
 
-  const { meta, analysis, transcript } = req.body;
+  const { meta, analysis, transcript, docTheme } = req.body;
   if (!analysis) return res.status(400).json({ error: 'analysis obrigatório' });
 
-  if (!GOOGLE_DOC_ID) return res.status(500).json({ error: 'GOOGLE_DOC_ID não configurado no .env' });
+  const docId = getDocId(docTheme || 'DEFAULT');
+  if (!docId) return res.status(500).json({ error: 'ID do documento não configurado para este tema' });
 
   try {
     const docs = google.docs({ version: 'v1', auth: oauth2Client });
 
     // Busca o doc para saber o índice final
-    const doc = await docs.documents.get({ documentId: GOOGLE_DOC_ID });
+    const doc = await docs.documents.get({ documentId: docId });
     const bodyContent = doc.data.body.content;
     const endIndex = bodyContent[bodyContent.length - 1].endIndex - 1;
 
@@ -278,14 +519,14 @@ app.post('/api/google/upload', async (req, res) => {
     ].join('\n');
 
     await docs.documents.batchUpdate({
-      documentId: GOOGLE_DOC_ID,
+      documentId: docId,
       requestBody: {
         requests: [{ insertText: { location: { index: endIndex }, text: block } }],
       },
     });
 
-    console.log(`✓ Atendimento appendado no Google Doc (${GOOGLE_DOC_ID})`);
-    res.json({ ok: true, docId: GOOGLE_DOC_ID });
+    console.log(`✓ Atendimento appendado no Google Doc (${docId})`);
+    res.json({ ok: true, docId: docId });
   } catch (e) {
     console.error('Docs append error:', e.message);
     res.status(500).json({ error: e.message });
@@ -302,6 +543,7 @@ function extractResolucao(analysis) {
   const match = analysis.match(/2\.\s*RESOLUÇÃO DO AGENTE[^\n]*\n([\s\S]*)/i);
   return match ? match[1].trim() : '';
 }
+
 function extractTema(analysis) {
   const match = analysis.match(/Tema:\s*(.+)/i);
   return match ? match[1].trim() : 'Não identificado';
